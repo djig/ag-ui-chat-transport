@@ -316,12 +316,41 @@ function convertAgUiEventToChunks(
       break;
 
     case 'TOOL_CALL_RESULT':
-      chunks.push({
-        type: 'tool-output-available',
-        toolCallId: event.toolCallId,
-        output: typeof event.content === 'string' ? event.content : event.content,
-        dynamic: true,
-      });
+      {
+        // Parse tool output: if content is an array with a single text part containing JSON,
+        // parse it into an object so UI components can render it properly.
+        //
+        // AG-UI protocol servers often return tool results as:
+        //   content: [{ type: 'text', text: '{"key":"value"}' }]
+        //
+        // This transport automatically detects JSON strings and parses them to objects:
+        //   output: { key: "value" }
+        //
+        // Non-JSON strings are preserved in their original array format:
+        //   content: [{ type: 'text', text: 'plain text result' }]
+        //   output: [{ type: 'text', text: 'plain text result' }]
+        let output = typeof event.content === 'string' ? event.content : event.content;
+        
+        if (Array.isArray(output) && output.length === 1 && output[0]?.type === 'text') {
+          const textContent = output[0].text;
+          if (typeof textContent === 'string') {
+            try {
+              // Try to parse as JSON
+              output = JSON.parse(textContent);
+            } catch {
+              // If it's not valid JSON, keep it as the original array
+              // This preserves non-JSON strings like plain text responses
+            }
+          }
+        }
+        
+        chunks.push({
+          type: 'tool-output-available',
+          toolCallId: event.toolCallId,
+          output,
+          dynamic: true,
+        });
+      }
       break;
 
     case 'STATE_SNAPSHOT':

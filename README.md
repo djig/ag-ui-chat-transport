@@ -1,33 +1,34 @@
 # ag-ui-chat-transport
 
-**⚠️ Experimental (v0.1)** - Working demo, tool UI visualization needs refinement
+**⚠️ Experimental (v0.1)** - Early release for testing and feedback
 
-Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents (LangGraph, Mastra, Google ADK, CrewAI, etc.) without adopting CopilotKit or assistant-ui.
+Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents without adopting CopilotKit or assistant-ui.
 
 ## Status
 
-**v0.1 - Experimental**
+**v0.1 - Experimental (October 2026)**
 
 - ✅ Core transport implementation complete
 - ✅ SSE (Server-Sent Events) parsing
 - ✅ All AG-UI event types mapped to AI SDK chunks
+- ✅ Text streaming working end-to-end
+- ✅ Backend tool execution working - tools are called and results returned
+- ✅ Tool output JSON parsing - JSON strings automatically parsed to objects for better UI rendering
 - ✅ Unit tests passing (10/10)
-- ✅ Mock AG-UI server working
-- ✅ **Text streaming working end-to-end** - Messages send and stream correctly
-- ✅ **Backend tool execution working** - Tools are called and results returned
-- ⚠️ Tool invocation UI display needs work - tool calls execute but don't render in UI (investigating)
+- ✅ Integration tests passing (3/3) - verified with AI SDK message assembly
+- ✅ Tested against custom AG-UI server using `@ag-ui/encoder`
+- ⚠️ **Not yet tested** against LangGraph, Mastra, or Google ADK AG-UI implementations
+- ⚠️ **Frontend tools not supported** - only backend tool execution
 
 As of October 2026:
-- **Vercel AI SDK v7** (`ai` package, 33.7M weekly downloads) dominates React agentic UIs with `useChat` and AI Elements
+- **Vercel AI SDK v7** (`ai` package) dominates React agentic UIs with `useChat` and AI Elements
 - **AG-UI 1.0** shipped September 30, 2026, becoming the standard protocol for agent↔UI communication
-- Major agent frameworks (LangGraph, Mastra, ADK, Pydantic AI, Claude Managed Agents, OpenAI Agents SDK) all support AG-UI
+- Major agent frameworks (LangGraph, Mastra, ADK) all support AG-UI
 - **But there's no bridge**: `useChat` can't talk to AG-UI agents directly
 
 This library fills that gap with a simple `ChatTransport` implementation.
 
 ## Installation
-
-**Note**: This is experimental. The core library works but `useChat` integration needs debugging.
 
 ```bash
 npm install ag-ui-chat-transport ai @ai-sdk/react
@@ -192,10 +193,42 @@ See [`examples/nextjs-basic`](./examples/nextjs-basic) for a complete working ex
 
 ## Limitations & Known Gaps
 
-1. **Tool Approval**: AG-UI interrupts for tool approval are not yet mapped to AI SDK approval parts. Frontend tools work, but human-in-the-loop approval needs custom handling.
-2. **Multimodal**: Text-only for now. AG-UI image/audio/video parts are not yet mapped.
-3. **Streaming State**: `STATE_DELTA` (JSON Patch) is exposed as-is; no automatic state merging.
-4. **Error Recovery**: Network errors require manual reconnection via `reconnectToStream`.
+1. **Frontend Tools**: Only backend tool execution is supported. Frontend tools (human-in-the-loop, tool approval) are not yet implemented.
+2. **Third-party AG-UI Servers**: Tested only against a custom server built with `@ag-ui/encoder`. Not yet tested with LangGraph, Mastra, or Google ADK AG-UI implementations.
+3. **Multimodal**: Text-only for now. AG-UI image/audio/video parts are not yet mapped.
+4. **Streaming State**: `STATE_DELTA` (JSON Patch) is exposed as-is; no automatic state merging.
+5. **Error Recovery**: Network errors require manual reconnection via `reconnectToStream`.
+
+## Tool Output Parsing
+
+The transport automatically parses JSON strings in tool outputs for better UI rendering:
+
+**AG-UI Response:**
+```json
+{
+  "type": "TOOL_CALL_RESULT",
+  "toolCallId": "tool-1",
+  "content": [{ "type": "text", "text": "{\"temperature\":72,\"condition\":\"sunny\"}" }]
+}
+```
+
+**Parsed Output:**
+```javascript
+{
+  toolCallId: "tool-1",
+  output: { temperature: 72, condition: "sunny" }  // Parsed as object
+}
+```
+
+Non-JSON strings are preserved in their original format:
+```javascript
+{
+  toolCallId: "tool-2",
+  output: [{ type: "text", text: "file1.txt\nfile2.txt" }]  // Preserved as array
+}
+```
+
+This behavior is tested in the integration test suite.
 
 ## Roadmap
 

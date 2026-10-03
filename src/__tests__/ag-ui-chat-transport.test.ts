@@ -191,7 +191,8 @@ describe('AgUiChatTransport', () => {
         {
           type: 'tool-output-available',
           toolCallId: 'tool-1',
-          output: [{ type: 'text', text: JSON.stringify({ temperature: 72, condition: 'sunny' }) }],
+          // Output is now parsed from JSON string to object
+          output: { temperature: 72, condition: 'sunny' },
           dynamic: true,
         },
         { type: 'finish', finishReason: 'stop' },
