@@ -1,8 +1,21 @@
 # ag-ui-chat-transport
 
+**⚠️ Experimental (v0.1)** - Core library works, frontend integration needs debugging
+
 Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents (LangGraph, Mastra, Google ADK, CrewAI, etc.) without adopting CopilotKit or assistant-ui.
 
-## Why?
+## Status
+
+**v0.1 - Experimental**
+
+- ✅ Core transport implementation complete
+- ✅ SSE (Server-Sent Events) parsing
+- ✅ All AG-UI event types mapped to AI SDK chunks
+- ✅ Unit tests passing (12/12)
+- ✅ Mock AG-UI server working
+- ⚠️ **Frontend integration issue**: `useChat` with custom transport not calling `sendMessages` (investigating compatibility with AI SDK v7)
+
+The backend API and event parsing work correctly (verified with curl). The integration with `useChat` requires further debugging.
 
 As of October 2026:
 - **Vercel AI SDK v7** (`ai` package, 33.7M weekly downloads) dominates React agentic UIs with `useChat` and AI Elements
@@ -13,6 +26,8 @@ As of October 2026:
 This library fills that gap with a simple `ChatTransport` implementation.
 
 ## Installation
+
+**Note**: This is experimental. The core library works but `useChat` integration needs debugging.
 
 ```bash
 npm install ag-ui-chat-transport ai @ai-sdk/react
@@ -116,7 +131,20 @@ function Chat() {
 }
 ```
 
-## Event Mapping
+## Wire Format
+
+AG-UI agents stream events using **SSE (Server-Sent Events)** format, per the AG-UI 1.0 specification:
+
+```
+data: {"type":"TEXT_MESSAGE_START","messageId":"msg-123",...}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-123","delta":"Hello"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"msg-123"}
+
+```
+
+Each event is prefixed with `data: ` and followed by `\n\n` (double newline). This library parses SSE streams and converts AG-UI events to AI SDK `UIMessageChunk` objects.
 
 | AG-UI Event | AI SDK Chunk | Notes |
 |---|---|---|
@@ -171,7 +199,31 @@ MIT
 
 PRs welcome! See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-## Related Projects
+## Testing Against Real AG-UI Servers
+
+The transport has been tested against a mock AG-UI server that follows the official SSE format. To test with real servers:
+
+**Mock Server** (included):
+```bash
+cd examples/nextjs-basic
+npm install && npm run dev
+# API endpoint: http://localhost:3456/api/agent
+```
+
+Test directly:
+```bash
+curl -X POST http://localhost:3456/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Hello"}]}' 
+```
+
+**Real AG-UI Servers** (not yet tested):
+- LangGraph with AG-UI adapter
+- Mastra with AG-UI output
+- Google ADK with AG-UI protocol
+- Other @ag-ui/core compatible servers
+
+Contributions testing against real servers welcome!
 
 - [Vercel AI SDK](https://sdk.vercel.ai) - The AI SDK this library extends
 - [AG-UI Protocol](https://github.com/ag-ui-protocol/ag-ui) - The protocol this library implements

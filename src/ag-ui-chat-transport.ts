@@ -97,6 +97,10 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
   ): Promise<ReadableStream<UIMessageChunk>> {
     const { chatId, messages, abortSignal, headers: optionHeaders, body: optionBody } = options;
 
+    console.log('[AgUiChatTransport] sendMessages called', { chatId, messageCount: messages.length });
+
+    console.log('[AgUiChatTransport] sendMessages called', { chatId, messageCount: messages.length });
+
     // Resolve headers
     const resolvedHeaders = await this.resolveHeaders();
     const mergedHeaders = {
@@ -115,6 +119,10 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
       ...optionBody,
     };
 
+    console.log('[AgUiChatTransport] Making request to', this.url, { body: requestBody });
+
+    console.log('[AgUiChatTransport] Making request to', this.url, { body: requestBody });
+
     // Make the request
     const response = await this.customFetch(this.url, {
       method: 'POST',
@@ -123,6 +131,10 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
       credentials: this.credentials,
       signal: abortSignal,
     });
+
+    console.log('[AgUiChatTransport] Got response', response.status, response.statusText);
+
+    console.log('[AgUiChatTransport] Got response', response.status, response.statusText);
 
     if (!response.ok) {
       throw new Error(`AG-UI request failed: ${response.status} ${response.statusText}`);
@@ -165,6 +177,7 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
 
   /**
    * Transforms an AG-UI event stream into an AI SDK UI message chunk stream.
+   * Parses SSE (Server-Sent Events) format: data: {...}\n\n
    */
   private transformAgUiStream(
     agUiStream: ReadableStream<Uint8Array>,
@@ -191,18 +204,34 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
             // Decode and accumulate the chunk
             buffer += textDecoder.decode(value, { stream: true });
 
-            // Process complete lines (AG-UI events are typically newline-delimited JSON)
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
+            // Process SSE events (separated by double newlines)
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() ?? ''; // Keep incomplete event in buffer
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
-                continue; // Skip empty lines and comments
+            for (const part of parts) {
+              const trimmed = part.trim();
+              if (!trimmed) continue;
+
+              // Parse SSE format: data: {...}
+              const lines = trimmed.split('\n');
+              const dataLines: string[] = [];
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  dataLines.push(line.slice(6)); // Remove 'data: ' prefix
+                } else if (line.startsWith('data:')) {
+                  dataLines.push(line.slice(5)); // Remove 'data:' prefix
+                }
+                // Ignore other SSE fields (event, id, retry, comments)
               }
 
+              if (dataLines.length === 0) continue;
+
+              // Join multi-line data fields
+              const jsonStr = dataLines.join('\n');
+
               try {
-                const event: AGUIEvent = JSON.parse(trimmed);
+                const event: AGUIEvent = JSON.parse(jsonStr);
                 const chunks = convertAgUiEventToChunks(event, {
                   currentMessageId,
                   currentToolCallId,
@@ -234,7 +263,7 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
                   controller.enqueue(chunk);
                 }
               } catch (err) {
-                console.error('Failed to parse AG-UI event:', trimmed, err);
+                console.error('Failed to parse AG-UI event:', jsonStr, err);
                 // Continue processing other events
               }
             }

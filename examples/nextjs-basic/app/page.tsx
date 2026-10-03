@@ -11,6 +11,7 @@ const transport = new AgUiChatTransport({
 
 export default function Home() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+    id: 'demo-chat',
     transport,
   });
 

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 /**
  * Mock AG-UI agent endpoint
  * This simulates an AG-UI protocol server (like LangGraph, Mastra, etc.)
- * In production, you'd connect to your actual AG-UI agent.
+ * using the official SSE (Server-Sent Events) format.
  */
 export async function POST(request: Request) {
   const body = await request.json();
@@ -13,111 +13,89 @@ export async function POST(request: Request) {
   const lastMessage = messages[messages.length - 1];
   const userInput = lastMessage?.content || '';
 
-  // Create a streaming response with AG-UI events
+  // Create a streaming response with AG-UI events in SSE format
   const encoder = new TextEncoder();
   
   const stream = new ReadableStream({
     async start(controller) {
+      // Helper to send SSE event
+      const sendEvent = (data: any) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      };
+
       try {
         // Send RUN_STARTED event
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({
-              type: 'RUN_STARTED',
-              runId: `run-${Date.now()}`,
-              timestamp: Date.now(),
-            }) + '\n'
-          )
-        );
+        sendEvent({
+          type: 'RUN_STARTED',
+          runId: `run-${Date.now()}`,
+          timestamp: Date.now(),
+        });
 
         await delay(100);
 
         // Check if user is asking about weather (tool call scenario)
         if (userInput.toLowerCase().includes('weather')) {
-          // Start a tool call
           const toolCallId = 'tool-' + Date.now();
           
-          controller.enqueue(
-            encoder.encode(
-              JSON.stringify({
-                type: 'TOOL_CALL_START',
-                toolCallId,
-                toolCallName: 'get_weather',
-                timestamp: Date.now(),
-              }) + '\n'
-            )
-          );
+          sendEvent({
+            type: 'TOOL_CALL_START',
+            toolCallId,
+            toolCallName: 'get_weather',
+            timestamp: Date.now(),
+          });
 
           await delay(50);
 
           // Stream tool arguments
-          const location = 'San Francisco';
-          const argsChunks = [`{"location": "`, location, `"}`];
+          const argsChunks = [`{"location": "`, 'San Francisco', `"}`];
           
           for (const chunk of argsChunks) {
-            controller.enqueue(
-              encoder.encode(
-                JSON.stringify({
-                  type: 'TOOL_CALL_ARGS',
-                  toolCallId,
-                  delta: chunk,
-                  timestamp: Date.now(),
-                }) + '\n'
-              )
-            );
+            sendEvent({
+              type: 'TOOL_CALL_ARGS',
+              toolCallId,
+              delta: chunk,
+              timestamp: Date.now(),
+            });
             await delay(30);
           }
 
-          // End tool call
-          controller.enqueue(
-            encoder.encode(
-              JSON.stringify({
-                type: 'TOOL_CALL_END',
-                toolCallId,
-                timestamp: Date.now(),
-              }) + '\n'
-            )
-          );
+          sendEvent({
+            type: 'TOOL_CALL_END',
+            toolCallId,
+            timestamp: Date.now(),
+          });
 
           await delay(100);
 
           // Return tool result
-          controller.enqueue(
-            encoder.encode(
-              JSON.stringify({
-                type: 'TOOL_CALL_RESULT',
-                toolCallId,
-                messageId: 'tool-msg-' + Date.now(),
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify({
-                      temperature: 72,
-                      condition: 'sunny',
-                      humidity: 45,
-                    }),
-                  },
-                ],
-                timestamp: Date.now(),
-              }) + '\n'
-            )
-          );
+          sendEvent({
+            type: 'TOOL_CALL_RESULT',
+            toolCallId,
+            messageId: 'tool-msg-' + Date.now(),
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  temperature: 72,
+                  condition: 'sunny',
+                  humidity: 45,
+                }),
+              },
+            ],
+            timestamp: Date.now(),
+          });
 
           await delay(50);
         }
 
         // Start text message
         const messageId = 'msg-' + Date.now();
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({
-              type: 'TEXT_MESSAGE_START',
-              messageId,
-              role: 'assistant',
-              timestamp: Date.now(),
-            }) + '\n'
-          )
-        );
+        sendEvent({
+          type: 'TEXT_MESSAGE_START',
+          messageId,
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
 
         await delay(50);
 
@@ -136,66 +114,50 @@ export async function POST(request: Request) {
         for (let i = 0; i < words.length; i++) {
           const chunk = (i === 0 ? '' : ' ') + words[i];
           
-          controller.enqueue(
-            encoder.encode(
-              JSON.stringify({
-                type: 'TEXT_MESSAGE_CONTENT',
-                messageId,
-                delta: chunk,
-                timestamp: Date.now(),
-              }) + '\n'
-            )
-          );
+          sendEvent({
+            type: 'TEXT_MESSAGE_CONTENT',
+            messageId,
+            delta: chunk,
+            timestamp: Date.now(),
+          });
 
           await delay(50);
         }
 
         // End text message
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({
-              type: 'TEXT_MESSAGE_END',
-              messageId,
-              timestamp: Date.now(),
-            }) + '\n'
-          )
-        );
+        sendEvent({
+          type: 'TEXT_MESSAGE_END',
+          messageId,
+          timestamp: Date.now(),
+        });
 
         await delay(50);
 
         // Send RUN_FINISHED event
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({
-              type: 'RUN_FINISHED',
-              runId: `run-${Date.now()}`,
-              threadId: 'thread-1',
-              outcome: {
-                type: 'success',
-              },
-              usage: [
-                {
-                  inputTokens: Math.floor(userInput.length / 4),
-                  outputTokens: Math.floor(response.length / 4),
-                  totalTokens: Math.floor((userInput.length + response.length) / 4),
-                },
-              ],
-              timestamp: Date.now(),
-            }) + '\n'
-          )
-        );
+        sendEvent({
+          type: 'RUN_FINISHED',
+          runId: `run-${Date.now()}`,
+          threadId: 'thread-1',
+          outcome: {
+            type: 'success',
+          },
+          usage: [
+            {
+              inputTokens: Math.floor(userInput.length / 4),
+              outputTokens: Math.floor(response.length / 4),
+              totalTokens: Math.floor((userInput.length + response.length) / 4),
+            },
+          ],
+          timestamp: Date.now(),
+        });
 
         controller.close();
       } catch (error) {
-        controller.enqueue(
-          encoder.encode(
-            JSON.stringify({
-              type: 'RUN_ERROR',
-              message: error instanceof Error ? error.message : 'Unknown error',
-              timestamp: Date.now(),
-            }) + '\n'
-          )
-        );
+        sendEvent({
+          type: 'RUN_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
         controller.close();
       }
     },
@@ -203,9 +165,10 @@ export async function POST(request: Request) {
 
   return new NextResponse(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     },
   });
 }

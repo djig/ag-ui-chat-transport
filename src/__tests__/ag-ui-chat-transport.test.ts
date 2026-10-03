@@ -3,7 +3,7 @@ import { AgUiChatTransport } from '../ag-ui-chat-transport';
 import type { UIMessage } from 'ai';
 
 /**
- * Helper to create a mock AG-UI response stream from events
+ * Helper to create a mock AG-UI response stream from events (SSE format)
  */
 function createMockAgUiStream(events: any[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -13,8 +13,8 @@ function createMockAgUiStream(events: any[]): ReadableStream<Uint8Array> {
     async pull(controller) {
       if (index < events.length) {
         const event = events[index++];
-        const line = JSON.stringify(event) + '\n';
-        controller.enqueue(encoder.encode(line));
+        const sseEvent = `data: ${JSON.stringify(event)}\n\n`;
+        controller.enqueue(encoder.encode(sseEvent));
       } else {
         controller.close();
       }
