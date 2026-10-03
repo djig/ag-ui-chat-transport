@@ -2,7 +2,8 @@
 
 import { useChat } from '@ai-sdk/react';
 import { AgUiChatTransport } from 'ag-ui-chat-transport';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import * as React from 'react';
 
 export default function Home() {
   // Create the transport inside the component
@@ -20,6 +21,19 @@ export default function Home() {
 
   const [input, setInput] = useState('');
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  // Debug: log messages to console
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      console.log('[Page] Last message:', {
+        id: lastMsg.id,
+        role: lastMsg.role,
+        parts: lastMsg.parts,
+        partsCount: lastMsg.parts?.length || 0,
+      });
+    }
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,53 +119,26 @@ export default function Home() {
                             <div className="font-semibold mb-2 text-blue-900 dark:text-blue-100">
                               🔧 Tool: {tool.toolName}
                             </div>
-                            {tool.state === 'input-streaming' && (
-                              <div className="text-blue-700 dark:text-blue-300">
-                                <span className="animate-pulse">Preparing arguments...</span>
+                            {tool.input && (
+                              <div>
+                                <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">Input:</div>
+                                <pre className="text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto border border-blue-200 dark:border-blue-700">
+                                  {JSON.stringify(tool.input, null, 2)}
+                                </pre>
                               </div>
                             )}
-                            {(tool.state === 'input-available' || tool.state === 'output-available') && (
-                              <div className="space-y-2">
-                                <div>
-                                  <div className="font-medium text-blue-800 dark:text-blue-200">Input:</div>
-                                  <pre className="mt-1 text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto">
-                                    {JSON.stringify(tool.input, null, 2)}
-                                  </pre>
-                                </div>
-                                {tool.output && (
-                                  <div>
-                                    <div className="font-medium text-green-800 dark:text-green-200">Output:</div>
-                                    <pre className="mt-1 text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto">
-                                      {JSON.stringify(tool.output, null, 2)}
-                                    </pre>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {tool.state === 'output-error' && (
-                              <div className="text-red-600 dark:text-red-400">
-                                Error: {tool.errorText}
+                            {tool.output && (
+                              <div className="mt-2">
+                                <div className="font-medium text-green-800 dark:text-green-200 mb-1">Output:</div>
+                                <pre className="text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto border border-green-200 dark:border-green-700">
+                                  {JSON.stringify(tool.output, null, 2)}
+                                </pre>
                               </div>
                             )}
                           </div>
                         ))}
                     </div>
                   )}
-
-                  {/* Data parts (state, usage, etc.) */}
-                  {message.parts
-                    ?.filter((part: any) => part.type?.startsWith('data-'))
-                    .map((part: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="mt-2 text-xs bg-gray-200 dark:bg-gray-600 rounded p-2"
-                      >
-                        <div className="font-semibold">{part.type}</div>
-                        <pre className="mt-1 opacity-80 overflow-x-auto">
-                          {JSON.stringify(part.data, null, 2)}
-                        </pre>
-                      </div>
-                    ))}
                 </div>
               </div>
             ))}

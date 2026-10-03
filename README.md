@@ -217,29 +217,40 @@ PRs welcome! See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Testing Against Real AG-UI Servers
 
-The transport has been tested against a mock AG-UI server that follows the official SSE format. To test with real servers:
+The transport has been tested against:
 
-**Mock Server** (included):
+1. **Custom AG-UI server using `@ag-ui/encoder`** (included in `examples/real-agui-server.mjs`)
+   - Uses official `EventEncoder.encodeSSE()` from `@ag-ui/encoder` v1.0.1
+   - Emits proper AG-UI 1.0 SSE events
+   - Successfully tested: 34 chunks including full tool call lifecycle
+   
+2. **Mock AG-UI server** (included in `examples/nextjs-basic/app/api/agent/route.ts`)
+   - Hand-crafted SSE events following AG-UI 1.0 spec
+   - Used for Next.js demo app
+
+To run the custom AG-UI server test:
 ```bash
-cd examples/nextjs-basic
-npm install && npm run dev
-# API endpoint: http://localhost:3456/api/agent
+# Terminal 1: Start the AG-UI server
+node examples/real-agui-server.mjs
+
+# Terminal 2: Run the test script
+node examples/test-real-server.mjs
 ```
 
-Test directly:
+Test with curl:
 ```bash
-curl -X POST http://localhost:3456/api/agent \
+curl -X POST http://localhost:8001/agent \
   -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"Hello"}]}' 
 ```
 
-**Real AG-UI Servers** (not yet tested):
+**Third-party AG-UI servers** (not yet tested):
 - LangGraph with AG-UI adapter
 - Mastra with AG-UI output
 - Google ADK with AG-UI protocol
-- Other @ag-ui/core compatible servers
+- Other `@ag-ui/core` compatible servers
 
-Contributions testing against real servers welcome!
+Contributions testing against LangGraph/Mastra/ADK welcome!
 
 - [Vercel AI SDK](https://sdk.vercel.ai) - The AI SDK this library extends
 - [AG-UI Protocol](https://github.com/ag-ui-protocol/ag-ui) - The protocol this library implements
