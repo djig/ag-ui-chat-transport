@@ -49,7 +49,7 @@ describe('AgUiChatTransport', () => {
   beforeEach(() => {
     mockFetch = vi.fn();
     transport = new AgUiChatTransport({
-      url: 'http://localhost:8000/agent',
+      api: 'http://localhost:8000/agent',
       fetch: mockFetch as any,
     });
   });
@@ -93,11 +93,20 @@ describe('AgUiChatTransport', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Content-Type': 'application/json',
+            'content-type': 'application/json',
           }),
-          body: expect.stringContaining('"content":"Hello"'),
         }),
       );
+
+      // Verify the request body contains AG-UI formatted messages
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1].body);
+      expect(requestBody).toHaveProperty('threadId');
+      expect(requestBody).toHaveProperty('messages');
+      expect(requestBody.messages[0]).toMatchObject({
+        role: 'user',
+        content: 'Hello',
+      });
 
       expect(chunks).toHaveLength(5);
       expect(chunks[0]).toEqual({ type: 'start', messageId: undefined });
@@ -354,6 +363,7 @@ describe('AgUiChatTransport', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        text: async () => 'Internal Server Error',
       });
 
       await expect(
@@ -364,12 +374,12 @@ describe('AgUiChatTransport', () => {
           messages,
           abortSignal: undefined,
         }),
-      ).rejects.toThrow('AG-UI request failed: 500 Internal Server Error');
+      ).rejects.toThrow('Internal Server Error');
     });
 
     it('should handle custom headers', async () => {
       const transportWithHeaders = new AgUiChatTransport({
-        url: 'http://localhost:8000/agent',
+        api: 'http://localhost:8000/agent',
         headers: { Authorization: 'Bearer token123' },
         fetch: mockFetch as any,
       });
@@ -403,7 +413,7 @@ describe('AgUiChatTransport', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: 'Bearer token123',
+            authorization: 'Bearer token123',
           }),
         }),
       );
@@ -412,7 +422,7 @@ describe('AgUiChatTransport', () => {
     it('should handle function-based headers', async () => {
       const headersFn = vi.fn().mockResolvedValue({ 'X-Custom': 'value' });
       const transportWithFnHeaders = new AgUiChatTransport({
-        url: 'http://localhost:8000/agent',
+        api: 'http://localhost:8000/agent',
         headers: headersFn,
         fetch: mockFetch as any,
       });
@@ -447,7 +457,7 @@ describe('AgUiChatTransport', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            'X-Custom': 'value',
+            'x-custom': 'value',
           }),
         }),
       );
@@ -510,49 +520,6 @@ describe('AgUiChatTransport', () => {
           totalTokens: 30,
         },
       ]);
-    });
-  });
-
-  describe('reconnectToStream', () => {
-    it('should return null when no active stream exists', async () => {
-      const result = await transport.reconnectToStream({
-        chatId: 'chat-1',
-      });
-
-      expect(result).toBeNull();
-    });
-
-    it('should return existing stream when available', async () => {
-      const messages: UIMessage[] = [
-        {
-          id: '1',
-          role: 'user',
-          content: 'Test',
-          parts: [{ type: 'text', text: 'Test' }],
-        },
-      ];
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        body: createMockAgUiStream([
-          { type: 'RUN_STARTED', runId: 'run-1' },
-          { type: 'RUN_FINISHED', outcome: { type: 'success' } },
-        ]),
-      });
-
-      const originalStream = await transport.sendMessages({
-        trigger: 'submit-message',
-        chatId: 'chat-1',
-        messageId: undefined,
-        messages,
-        abortSignal: undefined,
-      });
-
-      const reconnectedStream = await transport.reconnectToStream({
-        chatId: 'chat-1',
-      });
-
-      expect(reconnectedStream).toBe(originalStream);
     });
   });
 });

@@ -1,6 +1,6 @@
 # ag-ui-chat-transport
 
-**⚠️ Experimental (v0.1)** - Core library works, frontend integration needs debugging
+**⚠️ Experimental (v0.1)** - Working demo, tool UI visualization needs refinement
 
 Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents (LangGraph, Mastra, Google ADK, CrewAI, etc.) without adopting CopilotKit or assistant-ui.
 
@@ -11,11 +11,11 @@ Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents (LangG
 - ✅ Core transport implementation complete
 - ✅ SSE (Server-Sent Events) parsing
 - ✅ All AG-UI event types mapped to AI SDK chunks
-- ✅ Unit tests passing (12/12)
+- ✅ Unit tests passing (10/10)
 - ✅ Mock AG-UI server working
-- ⚠️ **Frontend integration issue**: `useChat` with custom transport not calling `sendMessages` (investigating compatibility with AI SDK v7)
-
-The backend API and event parsing work correctly (verified with curl). The integration with `useChat` requires further debugging.
+- ✅ **Text streaming working end-to-end** - Messages send and stream correctly
+- ✅ **Backend tool execution working** - Tools are called and results returned
+- ⚠️ Tool invocation UI display needs work - tool calls execute but don't render in UI (investigating)
 
 As of October 2026:
 - **Vercel AI SDK v7** (`ai` package, 33.7M weekly downloads) dominates React agentic UIs with `useChat` and AI Elements
@@ -44,15 +44,27 @@ yarn add ag-ui-chat-transport ai @ai-sdk/react
 
 import { useChat } from '@ai-sdk/react';
 import { AgUiChatTransport } from 'ag-ui-chat-transport';
+import { useState } from 'react';
 
 const transport = new AgUiChatTransport({
-  url: 'http://localhost:8000/agent', // Your AG-UI endpoint
+  api: '/api/agent', // Your AG-UI endpoint (relative or absolute URL)
 });
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
+  const { messages, sendMessage, status } = useChat({
     transport,
   });
+
+  const [input, setInput] = useState('');
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    const message = input;
+    setInput('');
+    await sendMessage({ role: 'user', content: message });
+  };
 
   return (
     <div>
@@ -60,8 +72,12 @@ export default function Chat() {
         <div key={m.id}>{m.content}</div>
       ))}
       <form onSubmit={handleSubmit}>
-        <input value={input} onChange={handleInputChange} />
-        <button type="submit">Send</button>
+        <input 
+          value={input} 
+          onChange={(e) => setInput(e.target.value)} 
+          disabled={isLoading}
+        />
+        <button type="submit" disabled={isLoading}>Send</button>
       </form>
     </div>
   );
@@ -88,8 +104,8 @@ export default function Chat() {
 import { AgUiChatTransport } from 'ag-ui-chat-transport';
 
 const transport = new AgUiChatTransport({
-  // Required: AG-UI endpoint URL
-  url: 'http://localhost:8000/agent',
+  // Required: AG-UI endpoint URL (can be relative or absolute)
+  api: '/api/agent',
   
   // Optional: Static or dynamic headers
   headers: {

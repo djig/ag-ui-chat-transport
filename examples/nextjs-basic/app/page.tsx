@@ -2,18 +2,39 @@
 
 import { useChat } from '@ai-sdk/react';
 import { AgUiChatTransport } from 'ag-ui-chat-transport';
-import { useState } from 'react';
-
-// Create the AG-UI transport
-const transport = new AgUiChatTransport({
-  url: '/api/agent',
-});
+import { useState, useMemo } from 'react';
 
 export default function Home() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  // Create the transport inside the component
+  const transport = useMemo(() => {
+    console.log('[Page] Creating AgUiChatTransport instance');
+    return new AgUiChatTransport({
+      api: '/api/agent',
+    });
+  }, []);
+
+  const { messages, sendMessage, status, error } = useChat({
     id: 'demo-chat',
     transport,
   });
+
+  const [input, setInput] = useState('');
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = input;
+    setInput('');
+    
+    console.log('[Page] Calling sendMessage with:', userMessage);
+    await sendMessage({ role: 'user', content: userMessage });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">

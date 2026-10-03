@@ -1,5 +1,5 @@
-import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai';
-import type { ChatRequestOptions } from 'ai';
+import { HttpChatTransport } from 'ai';
+import type { UIMessage, UIMessageChunk } from 'ai';
 import type { AGUIEvent, State } from '@ag-ui/core';
 
 /**
@@ -10,7 +10,7 @@ export interface AgUiChatTransportOptions {
    * The URL of the AG-UI agent endpoint.
    * This should point to your AG-UI protocol server (e.g., LangGraph, Mastra, ADK, etc.)
    */
-  url: string;
+  api?: string;
 
   /**
    * Optional custom headers to include in all requests.
@@ -49,7 +49,7 @@ export interface AgUiChatTransportOptions {
  * function ChatComponent() {
  *   const { messages, input, handleInputChange, handleSubmit } = useChat({
  *     transport: new AgUiChatTransport({
- *       url: 'http://localhost:8000/agent',
+ *       api: 'http://localhost:8000/agent',
  *     }),
  *   });
  *
@@ -63,126 +63,72 @@ export interface AgUiChatTransportOptions {
  * }
  * ```
  */
-export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
-  implements ChatTransport<UI_MESSAGE>
-{
-  private readonly url: string;
-  private readonly headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
-  private readonly customFetch: typeof fetch;
-  private readonly credentials: RequestCredentials;
+export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage> extends HttpChatTransport<UI_MESSAGE> {
   private readonly threadId?: string;
 
-  // Track active streams for reconnection
-  private activeStreams = new Map<string, ReadableStream<UIMessageChunk>>();
+  constructor(options: AgUiChatTransportOptions = {}) {
+    console.log('[AgUiChatTransport] Constructor called with options:', options);
+    super({
+      api: options.api ?? '/api/agent',
+      headers: options.headers,
+      fetch: options.fetch,
+      credentials: options.credentials,
+      prepareSendMessagesRequest: (options) => {
+        console.log('[AgUiChatTransport] prepareSendMessagesRequest called with', options.messages.length, 'messages');
+        // Convert AI SDK messages to AG-UI format
+        const agUiMessages = options.messages.map((message) => {
+          const role = message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system';
 
-  constructor(options: AgUiChatTransportOptions) {
-    this.url = options.url;
-    this.headers = options.headers;
-    this.customFetch = options.fetch ?? fetch;
-    this.credentials = options.credentials ?? 'same-origin';
+          // Extract text content from parts or fallback to content
+          let textContent = '';
+          if (message.parts) {
+            textContent = message.parts
+              .filter((part) => part.type === 'text')
+              .map((part: any) => part.text)
+              .join('');
+          } else if ('content' in message) {
+            textContent = (message as any).content;
+          }
+
+          const result: any = {
+            role,
+            content: textContent,
+          };
+
+          // Include tool calls if present
+          if ('toolInvocations' in message && (message as any).toolInvocations) {
+            result.toolCalls = (message as any).toolInvocations.map((tool: any) => ({
+              toolCallId: tool.toolCallId,
+              toolName: tool.toolName,
+              args: tool.args,
+              result: tool.result,
+            }));
+          }
+
+          return result;
+        });
+
+        return {
+          body: {
+            threadId: this.threadId ?? options.id,
+            messages: agUiMessages,
+            ...options.body,
+          },
+        };
+      },
+    });
+    console.log('[AgUiChatTransport] Constructor complete, api:', options.api ?? '/api/agent');
     this.threadId = options.threadId;
   }
 
   /**
-   * Sends messages to the AG-UI agent endpoint and returns a streaming response.
+   * Processes the AG-UI SSE response stream and transforms it into AI SDK UI message chunks.
+   * This method is called by HttpChatTransport.sendMessages after the fetch completes.
    */
-  async sendMessages(
-    options: {
-      trigger: 'submit-message' | 'regenerate-message';
-      chatId: string;
-      messageId: string | undefined;
-      messages: UI_MESSAGE[];
-      abortSignal: AbortSignal | undefined;
-    } & ChatRequestOptions,
-  ): Promise<ReadableStream<UIMessageChunk>> {
-    const { chatId, messages, abortSignal, headers: optionHeaders, body: optionBody } = options;
-
-    console.log('[AgUiChatTransport] sendMessages called', { chatId, messageCount: messages.length });
-
-    console.log('[AgUiChatTransport] sendMessages called', { chatId, messageCount: messages.length });
-
-    // Resolve headers
-    const resolvedHeaders = await this.resolveHeaders();
-    const mergedHeaders = {
-      'Content-Type': 'application/json',
-      ...resolvedHeaders,
-      ...optionHeaders,
-    };
-
-    // Convert AI SDK messages to AG-UI format
-    const agUiMessages = this.convertToAgUiMessages(messages);
-
-    // Prepare the AG-UI request payload
-    const requestBody = {
-      threadId: this.threadId ?? chatId,
-      messages: agUiMessages,
-      ...optionBody,
-    };
-
-    console.log('[AgUiChatTransport] Making request to', this.url, { body: requestBody });
-
-    console.log('[AgUiChatTransport] Making request to', this.url, { body: requestBody });
-
-    // Make the request
-    const response = await this.customFetch(this.url, {
-      method: 'POST',
-      headers: mergedHeaders,
-      body: JSON.stringify(requestBody),
-      credentials: this.credentials,
-      signal: abortSignal,
-    });
-
-    console.log('[AgUiChatTransport] Got response', response.status, response.statusText);
-
-    console.log('[AgUiChatTransport] Got response', response.status, response.statusText);
-
-    if (!response.ok) {
-      throw new Error(`AG-UI request failed: ${response.status} ${response.statusText}`);
-    }
-
-    if (!response.body) {
-      throw new Error('AG-UI response has no body');
-    }
-
-    // Create a transform stream that converts AG-UI events to AI SDK chunks
-    const stream = this.transformAgUiStream(response.body, chatId);
-
-    // Store the stream for potential reconnection
-    this.activeStreams.set(chatId, stream);
-
-    return stream;
-  }
-
-  /**
-   * Reconnects to an existing streaming response for the specified chat session.
-   */
-  async reconnectToStream(
-    options: {
-      chatId: string;
-      abortSignal?: AbortSignal;
-    } & ChatRequestOptions,
-  ): Promise<ReadableStream<UIMessageChunk> | null> {
-    const { chatId } = options;
-
-    // Check if we have an active stream for this chat
-    const existingStream = this.activeStreams.get(chatId);
-
-    if (existingStream) {
-      return existingStream;
-    }
-
-    // No active stream found
-    return null;
-  }
-
-  /**
-   * Transforms an AG-UI event stream into an AI SDK UI message chunk stream.
-   * Parses SSE (Server-Sent Events) format: data: {...}\n\n
-   */
-  private transformAgUiStream(
+  protected processResponseStream(
     agUiStream: ReadableStream<Uint8Array>,
-    chatId: string,
   ): ReadableStream<UIMessageChunk> {
+    console.log('[AgUiChatTransport] processResponseStream called');
     const textDecoder = new TextDecoder();
     let buffer = '';
     let currentMessageId: string | undefined;
@@ -278,62 +224,9 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage>
         }
       },
       cancel: () => {
-        // Clean up the stored stream reference when the stream is cancelled
-        this.activeStreams.delete(chatId);
+        // Stream cancelled by the client
       },
     });
-  }
-
-  /**
-   * Converts AI SDK UI messages to AG-UI message format.
-   */
-  private convertToAgUiMessages(messages: UI_MESSAGE[]): any[] {
-    return messages.map((message) => {
-      const role = message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system';
-
-      // Extract text content from parts or fallback to content
-      let textContent = '';
-      if (message.parts) {
-        textContent = message.parts
-          .filter((part) => part.type === 'text')
-          .map((part: any) => part.text)
-          .join('');
-      } else if ('content' in message) {
-        textContent = (message as any).content;
-      }
-
-      const result: any = {
-        role,
-        content: textContent,
-      };
-
-      // Include tool calls if present
-      if ('toolInvocations' in message && (message as any).toolInvocations) {
-        result.toolCalls = (message as any).toolInvocations.map((tool: any) => ({
-          toolCallId: tool.toolCallId,
-          toolName: tool.toolName,
-          args: tool.args,
-          result: tool.result,
-        }));
-      }
-
-      return result;
-    });
-  }
-
-  /**
-   * Resolves headers from static object or function.
-   */
-  private async resolveHeaders(): Promise<Record<string, string>> {
-    if (!this.headers) {
-      return {};
-    }
-
-    if (typeof this.headers === 'function') {
-      return await this.headers();
-    }
-
-    return this.headers;
   }
 }
 

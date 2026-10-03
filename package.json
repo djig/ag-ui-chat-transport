@@ -45,12 +45,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/ag-ui-chat-transport.git"
+    "url": "https://github.com/djig/ag-ui-chat-transport.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/ag-ui-chat-transport/issues"
+    "url": "https://github.com/djig/ag-ui-chat-transport/issues"
   },
-  "homepage": "https://github.com/yourusername/ag-ui-chat-transport#readme",
+  "homepage": "https://github.com/djig/ag-ui-chat-transport#readme",
   "peerDependencies": {
     "ai": "^7.0.0",
     "@ai-sdk/react": "^4.0.0",
