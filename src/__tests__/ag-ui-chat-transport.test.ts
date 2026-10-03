@@ -116,7 +116,7 @@ describe('AgUiChatTransport', () => {
       expect(chunks[4]).toEqual({ type: 'finish', finishReason: 'stop' });
     });
 
-    it('should handle tool calls correctly', async () => {
+    it('should handle tool calls with exact chunk sequence', async () => {
       const messages: UIMessage[] = [
         {
           id: '1',
@@ -157,31 +157,45 @@ describe('AgUiChatTransport', () => {
 
       const chunks = await collectChunks(stream);
 
-      // Verify tool call chunks
-      const toolStartChunk = chunks.find((c: any) => c.type === 'tool-input-start');
-      expect(toolStartChunk).toEqual({
-        type: 'tool-input-start',
-        toolCallId: 'tool-1',
-        toolName: 'get_weather',
-      });
-
-      const toolDeltaChunks = chunks.filter((c: any) => c.type === 'tool-input-delta');
-      expect(toolDeltaChunks).toHaveLength(3);
-
-      const toolAvailableChunk = chunks.find((c: any) => c.type === 'tool-input-available');
-      expect(toolAvailableChunk).toMatchObject({
-        type: 'tool-input-available',
-        toolCallId: 'tool-1',
-        toolName: 'get_weather',
-        input: { location: 'San Francisco' },
-      });
-
-      const toolOutputChunk = chunks.find((c: any) => c.type === 'tool-output-available');
-      expect(toolOutputChunk).toMatchObject({
-        type: 'tool-output-available',
-        toolCallId: 'tool-1',
-      });
-      expect(toolOutputChunk).toHaveProperty('output');
+      // Assert exact chunk sequence for tool call
+      expect(chunks).toEqual([
+        { type: 'start', messageId: undefined },
+        {
+          type: 'tool-input-start',
+          toolCallId: 'tool-1',
+          toolName: 'get_weather',
+          dynamic: true,
+        },
+        {
+          type: 'tool-input-delta',
+          toolCallId: 'tool-1',
+          inputTextDelta: '{"location": "',
+        },
+        {
+          type: 'tool-input-delta',
+          toolCallId: 'tool-1',
+          inputTextDelta: 'San Francisco',
+        },
+        {
+          type: 'tool-input-delta',
+          toolCallId: 'tool-1',
+          inputTextDelta: '"}',
+        },
+        {
+          type: 'tool-input-available',
+          toolCallId: 'tool-1',
+          toolName: 'get_weather',
+          input: { location: 'San Francisco' },
+          dynamic: true,
+        },
+        {
+          type: 'tool-output-available',
+          toolCallId: 'tool-1',
+          output: [{ type: 'text', text: JSON.stringify({ temperature: 72, condition: 'sunny' }) }],
+          dynamic: true,
+        },
+        { type: 'finish', finishReason: 'stop' },
+      ]);
     });
 
     it('should handle errors correctly', async () => {

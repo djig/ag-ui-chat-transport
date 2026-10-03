@@ -92,24 +92,49 @@ export default function Home() {
                       )) || message.content}
                   </div>
 
-                  {/* Tool invocations */}
-                  {message.toolInvocations && message.toolInvocations.length > 0 && (
+                  {/* Tool invocations from parts */}
+                  {message.parts?.filter((part: any) => part.type === 'dynamic-tool').length > 0 && (
                     <div className="mt-3 space-y-2">
-                      {message.toolInvocations.map((tool: any) => (
-                        <div
-                          key={tool.toolCallId}
-                          className="text-xs bg-gray-200 dark:bg-gray-600 rounded p-2"
-                        >
-                          <div className="font-semibold mb-1">
-                            🔧 Tool: {tool.toolName}
-                          </div>
-                          {tool.state === 'result' && tool.result && (
-                            <div className="opacity-80">
-                              Result: {JSON.stringify(tool.result, null, 2)}
+                      {message.parts
+                        ?.filter((part: any) => part.type === 'dynamic-tool')
+                        .map((tool: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="text-xs bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded p-3"
+                          >
+                            <div className="font-semibold mb-2 text-blue-900 dark:text-blue-100">
+                              🔧 Tool: {tool.toolName}
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {tool.state === 'input-streaming' && (
+                              <div className="text-blue-700 dark:text-blue-300">
+                                <span className="animate-pulse">Preparing arguments...</span>
+                              </div>
+                            )}
+                            {(tool.state === 'input-available' || tool.state === 'output-available') && (
+                              <div className="space-y-2">
+                                <div>
+                                  <div className="font-medium text-blue-800 dark:text-blue-200">Input:</div>
+                                  <pre className="mt-1 text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto">
+                                    {JSON.stringify(tool.input, null, 2)}
+                                  </pre>
+                                </div>
+                                {tool.output && (
+                                  <div>
+                                    <div className="font-medium text-green-800 dark:text-green-200">Output:</div>
+                                    <pre className="mt-1 text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto">
+                                      {JSON.stringify(tool.output, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {tool.state === 'output-error' && (
+                              <div className="text-red-600 dark:text-red-400">
+                                Error: {tool.errorText}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                     </div>
                   )}
 

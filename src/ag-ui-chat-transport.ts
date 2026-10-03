@@ -67,14 +67,12 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage> extends
   private readonly threadId?: string;
 
   constructor(options: AgUiChatTransportOptions = {}) {
-    console.log('[AgUiChatTransport] Constructor called with options:', options);
     super({
       api: options.api ?? '/api/agent',
       headers: options.headers,
       fetch: options.fetch,
       credentials: options.credentials,
       prepareSendMessagesRequest: (options) => {
-        console.log('[AgUiChatTransport] prepareSendMessagesRequest called with', options.messages.length, 'messages');
         // Convert AI SDK messages to AG-UI format
         const agUiMessages = options.messages.map((message) => {
           const role = message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system';
@@ -117,7 +115,6 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage> extends
         };
       },
     });
-    console.log('[AgUiChatTransport] Constructor complete, api:', options.api ?? '/api/agent');
     this.threadId = options.threadId;
   }
 
@@ -128,7 +125,6 @@ export class AgUiChatTransport<UI_MESSAGE extends UIMessage = UIMessage> extends
   protected processResponseStream(
     agUiStream: ReadableStream<Uint8Array>,
   ): ReadableStream<UIMessageChunk> {
-    console.log('[AgUiChatTransport] processResponseStream called');
     const textDecoder = new TextDecoder();
     let buffer = '';
     let currentMessageId: string | undefined;
@@ -279,6 +275,7 @@ function convertAgUiEventToChunks(
         type: 'tool-input-start',
         toolCallId: event.toolCallId,
         toolName: event.toolCallName,
+        dynamic: true,
       });
       break;
 
@@ -301,6 +298,7 @@ function convertAgUiEventToChunks(
               toolCallId: event.toolCallId,
               toolName: toolState.name,
               input: parsedArgs,
+              dynamic: true,
             });
           } catch {
             // If parsing fails, send error chunk
@@ -310,6 +308,7 @@ function convertAgUiEventToChunks(
               toolName: toolState.name,
               input: toolState.args,
               errorText: 'Failed to parse tool arguments',
+              dynamic: true,
             });
           }
         }
@@ -321,6 +320,7 @@ function convertAgUiEventToChunks(
         type: 'tool-output-available',
         toolCallId: event.toolCallId,
         output: typeof event.content === 'string' ? event.content : event.content,
+        dynamic: true,
       });
       break;
 
