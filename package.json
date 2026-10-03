@@ -1,0 +1,78 @@
+{
+  "name": "ag-ui-chat-transport",
+  "version": "0.1.0",
+  "description": "Bridge Vercel AI SDK UI (useChat, AI Elements) to AG-UI protocol agents",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup && tsc --emitDeclarationOnly --declaration --declarationMap",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "ai",
+    "ai-sdk",
+    "vercel-ai-sdk",
+    "ag-ui",
+    "agent",
+    "chat",
+    "streaming",
+    "transport",
+    "langgraph",
+    "mastra",
+    "adk",
+    "crewai",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ag-ui-chat-transport.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/ag-ui-chat-transport/issues"
+  },
+  "homepage": "https://github.com/yourusername/ag-ui-chat-transport#readme",
+  "peerDependencies": {
+    "ai": "^7.0.0",
+    "@ai-sdk/react": "^4.0.0",
+    "@ag-ui/client": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ag-ui/client": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ag-ui/client": "^1.0.1",
+    "@ag-ui/core": "^1.0.1",
+    "@ai-sdk/react": "^4.0.130",
+    "@types/node": "^20.17.18",
+    "@vitest/ui": "^5.0.3",
+    "ai": "^7.0.127",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
