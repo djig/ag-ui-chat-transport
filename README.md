@@ -1,5 +1,8 @@
 # ag-ui-chat-transport
 
+[![CI](https://github.com/djig/ag-ui-chat-transport/actions/workflows/ci.yml/badge.svg)](https://github.com/djig/ag-ui-chat-transport/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **⚠️ Experimental (v0.1)** - Early release for testing and feedback
 
 Bridge Vercel AI SDK UI (`useChat`, AI Elements) to AG-UI protocol agents without adopting CopilotKit or assistant-ui.
@@ -30,13 +33,17 @@ This library fills that gap with a simple `ChatTransport` implementation.
 
 ## Installation
 
+**Install from GitHub** (npm package coming soon):
+
 ```bash
-npm install ag-ui-chat-transport ai @ai-sdk/react
+npm install djig/ag-ui-chat-transport ai @ai-sdk/react
 # or
-pnpm add ag-ui-chat-transport ai @ai-sdk/react
+pnpm add djig/ag-ui-chat-transport ai @ai-sdk/react
 # or
-yarn add ag-ui-chat-transport ai @ai-sdk/react
+yarn add djig/ag-ui-chat-transport ai @ai-sdk/react
 ```
+
+The package builds automatically during installation via the `prepare` script.
 
 ## Quick Start
 
@@ -290,3 +297,7 @@ Contributions testing against LangGraph/Mastra/ADK welcome!
 - [AI Elements](https://elements.ai-sdk.dev) - Pre-built UI components that work with this transport
 - [CopilotKit](https://github.com/CopilotKit/CopilotKit) - Full-stack framework with built-in AG-UI support
 - [assistant-ui](https://github.com/assistant-ui/assistant-ui) - Chat primitives with AG-UI adapter
+
+---
+
+More by [@djig](https://github.com/djig): [ui-loop](https://github.com/djig/ui-loop) (token-budgeted visual feedback MCP) · [drift-guard](https://github.com/djig/drift-guard) (blocks stale React/Next/Tailwind patterns) · [claude-onair](https://github.com/djig/claude-onair) (Claude Code desk status light)
